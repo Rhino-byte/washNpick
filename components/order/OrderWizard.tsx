@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   defaultOrderFormData,
@@ -24,8 +24,11 @@ import {
 } from "@/lib/order-storage";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { AuthWelcomeBanner } from "@/components/auth/AuthWelcomeBanner";
+import { buildFormPrefill } from "@/lib/auth-profile";
 import { useServices } from "@/hooks/useServices";
 import { calculateEstimatedTotal } from "@/lib/pricing";
+import { OrderSignInGate } from "./OrderSignInGate";
 import { StepIndicator } from "./StepIndicator";
 import { PhoneInput } from "./PhoneInput";
 import { LocationPicker } from "./LocationPicker";
@@ -42,10 +45,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { TIME_SLOT_LABELS } from "@/lib/order-types";
-import { ArrowLeft, ArrowRight, LogIn } from "lucide-react";
+import { TIME_SLOT_LABELS, type TimeSlot } from "@/lib/order-types";
+import {
+  getAvailableTimeSlots,
+  getFirstAvailableTimeSlot,
+  todayInBusinessTz,
+} from "@/lib/pickup-scheduling";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 const TOTAL_STEPS = 4;
+
+function normalizePickupSchedule(
+  pickupDate: string,
+  pickupTimeSlot: TimeSlot,
+): Pick<OrderFormData, "pickupDate" | "pickupTimeSlot"> {
+  const dates = getAvailablePickupDates();
+  const date = dates.includes(pickupDate) ? pickupDate : (dates[0] ?? pickupDate);
+  const slots = getAvailableTimeSlots(date);
+  const slot = slots.includes(pickupTimeSlot)
+    ? pickupTimeSlot
+    : (getFirstAvailableTimeSlot(date) ?? pickupTimeSlot);
+  return { pickupDate: date, pickupTimeSlot: slot };
+}
 
 function buildInitialOrderData(
   serviceParam: ServiceId | null,
@@ -70,9 +91,12 @@ function buildInitialOrderData(
   }
 
   const dates = getAvailablePickupDates();
-  if (!initial.pickupDate) {
-    initial.pickupDate = dates[0];
+  if (!dates.includes(initial.pickupDate)) {
+    initial.pickupDate = dates[0] ?? initial.pickupDate;
   }
+  const schedule = normalizePickupSchedule(initial.pickupDate, initial.pickupTimeSlot);
+  initial.pickupDate = schedule.pickupDate;
+  initial.pickupTimeSlot = schedule.pickupTimeSlot;
 
   return initial;
 }
@@ -112,18 +136,17 @@ export function OrderWizard() {
   const serviceParam = searchParams.get("service") as ServiceId | null;
   const {
     profile,
+    firebaseUser,
     loading: authLoading,
-    signIn,
-    signInError,
-    signInLoading,
+    syncingProfile,
     getToken,
     refreshProfile,
     isConfigured,
-  } =
-    useAuth();
+  } = useAuth();
   const { services } = useServices();
 
   const [step, setStep] = useState(1);
+  const hasAppliedProfileRef = useRef(false);
   const [data, setData] = useState<OrderFormData>(() =>
     buildInitialOrderData(serviceParam, { includeDraft: false }),
   );
@@ -145,34 +168,27 @@ export function OrderWizard() {
   }, [data]);
 
   useEffect(() => {
-    if (authLoading) return;
-
-    if (profile?.profile_complete) {
-      const addr = profile.default_address;
-      setData((prev) => ({
-        ...prev,
-        firstName: profile.first_name ?? prev.firstName,
-        lastName: profile.last_name ?? prev.lastName,
-        phone: profile.phone ?? prev.phone,
-        email: profile.email ?? prev.email,
-        area: addr?.area ?? prev.area,
-        landmark: addr?.address_line ?? prev.landmark,
-        formattedAddress: addr?.formatted_address ?? prev.formattedAddress,
-        placeId: addr?.place_id ?? prev.placeId,
-        latitude: addr?.latitude != null ? Number(addr.latitude) : prev.latitude,
-        longitude: addr?.longitude != null ? Number(addr.longitude) : prev.longitude,
-        paymentMethod: profile.is_burned ? "mpesa" : prev.paymentMethod,
-      }));
-      setStep(2);
-    } else if (profile && !profile.profile_complete) {
-      setData((prev) => ({
-        ...prev,
-        email: profile.email ?? prev.email,
-        firstName: profile.first_name ?? prev.firstName,
-        lastName: profile.last_name ?? prev.lastName,
-      }));
+    if (!profile) {
+      hasAppliedProfileRef.current = false;
     }
-  }, [profile, authLoading]);
+  }, [profile]);
+
+  useEffect(() => {
+    if (authLoading || !profile) return;
+    if (hasAppliedProfileRef.current) return;
+    hasAppliedProfileRef.current = true;
+
+    const prefill = buildFormPrefill(profile, firebaseUser);
+    setData((prev) => ({
+      ...prev,
+      ...prefill,
+      paymentMethod: prefill.paymentMethod ?? prev.paymentMethod,
+    }));
+
+    if (profile.profile_complete) {
+      setStep(2);
+    }
+  }, [profile, firebaseUser, authLoading]);
 
   useEffect(() => {
     if (data.services.length === 0) return;
@@ -197,6 +213,27 @@ export function OrderWizard() {
         setQuoteTotal(calculateEstimatedTotal(data, services));
       });
   }, [data.services, data.estimatedWeightKg, getToken, services, data]);
+
+  useEffect(() => {
+    if (step !== 3) return;
+
+    const syncSchedule = () => {
+      setData((prev) => {
+        const next = normalizePickupSchedule(prev.pickupDate, prev.pickupTimeSlot);
+        if (
+          next.pickupDate === prev.pickupDate &&
+          next.pickupTimeSlot === prev.pickupTimeSlot
+        ) {
+          return prev;
+        }
+        return { ...prev, ...next };
+      });
+    };
+
+    syncSchedule();
+    const interval = setInterval(syncSchedule, 60_000);
+    return () => clearInterval(interval);
+  }, [step]);
 
   const updateData = useCallback((updates: Partial<OrderFormData>) => {
     setData((prev) => ({ ...prev, ...updates }));
@@ -273,42 +310,27 @@ export function OrderWizard() {
     return <OrderConfirmation order={submittedOrder} />;
   }
 
+  if (isConfigured && !profile) {
+    return <OrderSignInGate />;
+  }
+
   const pickupDates = getAvailablePickupDates();
+  const availableTimeSlots = getAvailableTimeSlots(data.pickupDate);
   const estimatedTotal = quoteTotal ?? calculateEstimatedTotal(data, services);
   const isBurned = profile?.is_burned ?? false;
   const showPhoneOnly =
     profile && !profile.profile_complete && profile.email && step === 1;
+  const emailReadOnly = Boolean(profile?.email);
 
   return (
     <div className="pb-24">
       <StepIndicator currentStep={step} />
 
+      {profile && <AuthWelcomeBanner />}
+
       {isBurned && (
         <div className="mx-4 mb-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">
           Deposit required before we accept your order.
-        </div>
-      )}
-
-      {!authLoading && isConfigured && !profile && (
-        <div className="mx-4 mb-4 rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm text-muted">
-            Sign in with Google to save your details and order faster next time.
-          </p>
-          {signInError && (
-            <p className="mt-2 text-sm text-red-300">{signInError}</p>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2"
-            loading={signInLoading}
-            loadingText="Sign in with Google"
-            overlay={false}
-            onClick={() => void signIn()}
-          >
-            <LogIn className="h-4 w-4" />
-            Sign in with Google
-          </Button>
         </div>
       )}
 
@@ -366,6 +388,8 @@ export function OrderWizard() {
                 value={data.email}
                 onChange={(e) => updateData({ email: e.target.value })}
                 error={errors.email}
+                readOnly={emailReadOnly}
+                className={emailReadOnly ? "opacity-80" : undefined}
               />
             </div>
             <LocationPicker
@@ -431,7 +455,14 @@ export function OrderWizard() {
               <Select
                 id="pickupDate"
                 value={data.pickupDate}
-                onChange={(e) => updateData({ pickupDate: e.target.value })}
+                onChange={(e) => {
+                  const pickupDate = e.target.value;
+                  const firstSlot = getFirstAvailableTimeSlot(pickupDate);
+                  updateData({
+                    pickupDate,
+                    ...(firstSlot ? { pickupTimeSlot: firstSlot } : {}),
+                  });
+                }}
                 error={errors.pickupDate}
               >
                 {pickupDates.map((date) => (
@@ -453,13 +484,20 @@ export function OrderWizard() {
                     pickupTimeSlot: e.target.value as OrderFormData["pickupTimeSlot"],
                   })
                 }
+                error={errors.pickupTimeSlot}
               >
-                {Object.entries(TIME_SLOT_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+                {availableTimeSlots.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {TIME_SLOT_LABELS[slot]}
                   </option>
                 ))}
               </Select>
+              {data.pickupDate === todayInBusinessTz() &&
+                availableTimeSlots.length < 3 && (
+                  <p className="mt-1 text-xs text-muted">
+                    Earlier time slots today are no longer available.
+                  </p>
+                )}
             </div>
 
             <div className="glass-card rounded-2xl p-4">
@@ -557,6 +595,7 @@ export function OrderWizard() {
               className="flex-1"
               loading={submitting}
               loadingText="Placing order"
+              overlay
               disabled={isBurned && data.paymentMethod === "cod"}
             >
               Place order

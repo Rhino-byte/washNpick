@@ -1,5 +1,6 @@
 import type { ApiOrder } from "./api";
 import type { OrderFormData, OrderStatus, StoredOrder } from "./order-types";
+import { getAvailablePickupDates as computePickupDates } from "./pickup-scheduling";
 import { calculateEstimatedTotal } from "./pricing";
 import { services as fallbackServices } from "./mock-data";
 
@@ -80,14 +81,7 @@ export function apiOrderToStored(order: ApiOrder, contact?: Partial<OrderFormDat
 }
 
 export function getAvailablePickupDates(): string[] {
-  const dates: string[] = [];
-  const today = new Date();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
-  }
-  return dates;
+  return computePickupDates();
 }
 
 export function formatDisplayDate(isoDate: string): string {

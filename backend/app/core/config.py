@@ -62,6 +62,8 @@ class Settings(BaseSettings):
 
     admin_api_secret: str = ""
 
+    staff_firebase_uids: str = ""
+
     @field_validator("database_url", mode="before")
     @classmethod
     def _normalize_db_url(cls, value: str) -> str:
@@ -70,6 +72,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def staff_uid_list(self) -> list[str]:
+        return [u.strip() for u in self.staff_firebase_uids.split(",") if u.strip()]
 
     @property
     def mpesa_base_url(self) -> str:

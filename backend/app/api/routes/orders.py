@@ -18,6 +18,7 @@ from app.schemas import (
 from app.services.notifications import send_order_status_whatsapp
 from app.services.payments import initiate_stk_push
 from app.services.pricing import check_coverage, create_order, normalize_address, quote_order
+from app.services.scheduling import validate_pickup_schedule
 from app.services.users import profile_complete, upsert_address
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -104,6 +105,11 @@ async def create_order_endpoint(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Delivery location is outside our service area",
             )
+
+    try:
+        validate_pickup_schedule(payload.pickup_date, payload.pickup_time_slot)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     try:
         order = await create_order(db, user, payload)

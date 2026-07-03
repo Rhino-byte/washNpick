@@ -3,18 +3,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, health, locations, orders, payments, services, users
+from app.api.routes import admin, auth, health, locations, orders, payments, services, staff, users
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.deps import init_firebase
 from app.services.pricing import seed_services_from_env
+from app.services.staff import seed_staff_from_env
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_firebase()
+    settings = get_settings()
     async with AsyncSessionLocal() as db:
         await seed_services_from_env(db)
+        await seed_staff_from_env(db, settings)
         await db.commit()
     yield
 
@@ -40,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(locations.locations_router, prefix=prefix)
     app.include_router(orders.router, prefix=prefix)
     app.include_router(payments.router, prefix=prefix)
+    app.include_router(staff.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
 
     return app

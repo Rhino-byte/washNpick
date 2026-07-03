@@ -4,8 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models import User, UserAddress
-from app.schemas import AddressInput, AddressResponse, UserProfileResponse, UserProfileUpdate
+from app.models import Order, User, UserAddress
+from app.schemas import (
+    AddressInput,
+    AddressResponse,
+    OrderListItem,
+    UserProfileResponse,
+    UserProfileUpdate,
+)
 from app.services.users import build_profile_response, normalize_phone, upsert_address
 
 router = APIRouter(prefix="/me", tags=["users"])
@@ -39,6 +45,20 @@ async def update_me(
         user.phone = normalized
     await db.flush()
     return await build_profile_response(db, user)
+
+
+@router.get("/orders", response_model=list[OrderListItem])
+async def list_my_orders(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[OrderListItem]:
+    result = await db.execute(
+        select(Order)
+        .where(Order.user_id == user.id)
+        .order_by(Order.created_at.desc())
+        .limit(50)
+    )
+    return [OrderListItem.model_validate(o) for o in result.scalars().all()]
 
 
 @router.get("/addresses", response_model=list[AddressResponse])

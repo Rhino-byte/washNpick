@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Phone, LogIn, LogOut } from "lucide-react";
+import { Phone, LogIn } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
+import { UserMenu } from "./UserMenu";
 import { siteConfig, formatPhoneTel } from "@/lib/site-config";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
-  const { profile, isConfigured, signIn, signOut, loading, signInError, signInLoading, signOutLoading } =
+  const { profile, isConfigured, signIn, loading, signInError, signInLoading } =
     useAuth();
 
   return (
@@ -24,29 +25,20 @@ export function Header() {
         <div className="flex shrink-0 items-center gap-1">
           {isConfigured && !loading && (
             profile ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                loading={signOutLoading}
-                loadingText=""
-                overlay={false}
-                onClick={() => void signOut()}
-                className="h-10 rounded-full border border-border px-3"
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+              <UserMenu />
             ) : (
               <Button
                 variant="ghost"
                 size="sm"
                 loading={signInLoading}
-                loadingText=""
+                loadingText="Sign in"
                 overlay={false}
                 onClick={() => void signIn()}
+                className="gap-1.5"
                 aria-label="Sign in with Google"
               >
                 <LogIn className="h-4 w-4" />
+                Sign in
               </Button>
             )
           )}

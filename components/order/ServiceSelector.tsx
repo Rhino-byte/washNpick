@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 
 interface ServiceSelectorProps {
   data: OrderFormData;
@@ -41,7 +41,9 @@ export function ServiceSelector({
   const updateQuantity = (serviceId: ServiceId, quantity: number) => {
     onChange({
       services: data.services.map((s) =>
-        s.serviceId === serviceId ? { ...s, quantity: Math.max(1, quantity) } : s,
+        s.serviceId === serviceId
+          ? { ...s, quantity: Math.min(50, Math.max(1, quantity)) }
+          : s,
       ),
     });
   };
@@ -96,18 +98,38 @@ export function ServiceSelector({
 
                 {selected && service.unit === "item" && selection && (
                   <div className="mt-3 ml-8">
-                    <Label htmlFor={`qty-${service.id}`}>Number of items</Label>
-                    <Input
-                      id={`qty-${service.id}`}
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={selection.quantity}
-                      onChange={(e) =>
-                        updateQuantity(service.id, parseInt(e.target.value) || 1)
-                      }
-                      className="mt-1 max-w-[120px]"
-                    />
+                    <Label>Number of items</Label>
+                    <div className="mt-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateQuantity(service.id, selection.quantity - 1)
+                        }
+                        disabled={selection.quantity <= 1}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Decrease ${service.name} quantity`}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span
+                        className="min-w-[2ch] text-center text-lg font-semibold tabular-nums text-foreground"
+                        aria-live="polite"
+                        aria-label={`${selection.quantity} items`}
+                      >
+                        {selection.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateQuantity(service.id, selection.quantity + 1)
+                        }
+                        disabled={selection.quantity >= 50}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Increase ${service.name} quantity`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

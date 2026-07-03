@@ -40,7 +40,7 @@ export function Button({
   fullWidth,
   loading = false,
   loadingText,
-  overlay = true,
+  overlay = false,
   disabled,
   children,
   ...props

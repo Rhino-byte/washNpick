@@ -18,6 +18,13 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   delivered: "Delivered",
 };
 
+export function getNextOrderStatus(current: string): OrderStatus | null {
+  const idx = ORDER_STATUSES.indexOf(current as OrderStatus);
+  if (idx === -1) return "pending_pickup";
+  if (idx >= ORDER_STATUSES.length - 1) return null;
+  return ORDER_STATUSES[idx + 1];
+}
+
 export type TimeSlot = "morning" | "afternoon" | "evening";
 
 export const TIME_SLOT_LABELS: Record<TimeSlot, string> = {

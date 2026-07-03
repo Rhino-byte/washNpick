@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export class ApiError extends Error {
   constructor(
@@ -14,15 +15,36 @@ async function request<T>(
   path: string,
   options: RequestInit & { token?: string | null } = {},
 ): Promise<T> {
-  const { token, headers, ...rest } = options;
-  const res = await fetch(`${API_URL}${path}`, {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-  });
+  const { token, headers, signal: externalSignal, ...rest } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const abortFromExternal = () => controller.abort();
+  externalSignal?.addEventListener("abort", abortFromExternal);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...rest,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError(
+        `Could not reach the server at ${API_URL}. Make sure the backend is running.`,
+        0,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    externalSignal?.removeEventListener("abort", abortFromExternal);
+  }
 
   if (!res.ok) {
     let detail = res.statusText;
@@ -87,6 +109,14 @@ export interface ApiQuote {
   }>;
 }
 
+export interface ApiOrderListItem {
+  id: string;
+  status: string;
+  estimated_total: number;
+  pickup_date: string | null;
+  created_at: string;
+}
+
 export interface ApiOrder {
   id: string;
   status: string;
@@ -111,7 +141,7 @@ export interface ApiOrder {
   addresses: Array<{
     type: "pickup" | "delivery";
     area: string;
-    address_line: string;
+    address_line: string | null;
     formatted_address: string | null;
     latitude: number | null;
     longitude: number | null;
@@ -122,6 +152,25 @@ export interface ApiOrder {
     created_at: string;
   }>;
   created_at: string;
+}
+
+export interface ApiStaffMember {
+  id: string;
+  firebase_uid: string;
+  display_name: string;
+  email: string;
+}
+
+export interface ApiStaffOrderListItem {
+  id: string;
+  status: string;
+  estimated_total: number;
+  pickup_date: string | null;
+  pickup_time_slot: string | null;
+  created_at: string;
+  customer_first_name: string | null;
+  customer_last_name: string | null;
+  customer_phone: string | null;
 }
 
 export const api = {
@@ -136,6 +185,15 @@ export const api = {
     }),
 
   getMe: (token: string) => request<ApiUserProfile>("/api/v1/me", { token }),
+
+  getMyOrders: (token: string) =>
+    request<ApiOrderListItem[]>("/api/v1/me/orders", { token }),
+
+  getMyAddresses: (token: string) =>
+    request<ApiAddress[]>("/api/v1/me/addresses", { token }),
+
+  getOrder: (token: string, orderId: string) =>
+    request<ApiOrder>(`/api/v1/orders/${encodeURIComponent(orderId)}`, { token }),
 
   updateMe: (
     token: string,
@@ -204,4 +262,49 @@ export const api = {
     request<ApiOrder>(
       `/api/v1/orders/track?ref=${encodeURIComponent(ref)}&phone_last4=${encodeURIComponent(phoneLast4)}`,
     ),
+
+  getStaffMe: (token: string) =>
+    request<ApiStaffMember>("/api/v1/staff/me", { token }),
+
+  listStaffOrders: (
+    token: string,
+    params?: {
+      status?: string;
+      pickup_date?: string;
+      search?: string;
+      include_cancelled?: boolean;
+    },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.pickup_date) qs.set("pickup_date", params.pickup_date);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.include_cancelled) qs.set("include_cancelled", "true");
+    const query = qs.toString();
+    return request<ApiStaffOrderListItem[]>(
+      `/api/v1/staff/orders${query ? `?${query}` : ""}`,
+      { token },
+    );
+  },
+
+  getStaffOrder: (token: string, orderId: string) =>
+    request<ApiOrder>(`/api/v1/staff/orders/${encodeURIComponent(orderId)}`, { token }),
+
+  updateStaffOrderStatus: (
+    token: string,
+    orderId: string,
+    body: { status: string; note?: string | null },
+  ) =>
+    request<ApiOrder>(`/api/v1/staff/orders/${encodeURIComponent(orderId)}/status`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(body),
+    }),
+
+  setStaffFinalTotal: (token: string, orderId: string, final_total: number) =>
+    request<ApiOrder>(`/api/v1/staff/orders/${encodeURIComponent(orderId)}/final-total`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ final_total }),
+    }),
 };

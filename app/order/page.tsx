@@ -11,13 +11,7 @@ export const metadata: Metadata = {
 export default function OrderPage() {
   return (
     <MobileLayout hideFooter>
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent-start border-t-transparent" />
-          </div>
-        }
-      >
+      <Suspense fallback={<div className="min-h-[40vh]" aria-busy="true" />}>
         <OrderWizard />
       </Suspense>
     </MobileLayout>

@@ -42,6 +42,22 @@ button {
   font-size: 16px;
 }
 
+/* Native select dropdown lists — match app dark theme (OS picker was rendering white) */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #0c1220;
+  color: #f1f5f9;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #1a2332;
+  color: #f1f5f9;
+}
+
 /* Ambient gradient shell */
 .app-shell {
   position: relative;

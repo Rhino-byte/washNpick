@@ -16,7 +16,7 @@ from app.models.enums import (
 class AddressInput(BaseModel):
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
-    address_line: str | None = Field(default=None, max_length=200)
+    address_line: str | None = None
     area: str | None = None
     formatted_address: str | None = None
     place_id: str | None = None
@@ -108,10 +108,20 @@ class OrderItemResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrderListItem(BaseModel):
+    id: str
+    status: OrderStatus
+    estimated_total: int
+    pickup_date: date | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class OrderAddressResponse(BaseModel):
     type: AddressType
     area: str
-    address_line: str
+    address_line: str | None = None
     formatted_address: str | None
     latitude: float | None
     longitude: float | None
@@ -184,3 +194,29 @@ class AdminStatusUpdate(BaseModel):
 
 class FinalTotalUpdate(BaseModel):
     final_total: int = Field(gt=0)
+
+
+class StaffMemberResponse(BaseModel):
+    id: UUID
+    firebase_uid: str
+    display_name: str
+    email: str
+
+    model_config = {"from_attributes": True}
+
+
+class StaffOrderListItem(BaseModel):
+    id: str
+    status: OrderStatus
+    estimated_total: int
+    pickup_date: date | None
+    pickup_time_slot: TimeSlot | None
+    created_at: datetime
+    customer_first_name: str | None
+    customer_last_name: str | None
+    customer_phone: str | None
+
+
+class StaffStatusUpdate(BaseModel):
+    status: OrderStatus
+    note: str | None = None

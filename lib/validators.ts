@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  getAvailableTimeSlots,
+  isPickupSlotAvailable,
+  pickupSlotUnavailableMessage,
+} from "@/lib/pickup-scheduling";
 
 const phoneSchema = z
   .string()
@@ -72,6 +77,21 @@ export const scheduleStepSchema = z
           path: ["deliveryLatitude"],
         });
       }
+    }
+    if (!isPickupSlotAvailable(data.pickupDate, data.pickupTimeSlot)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: pickupSlotUnavailableMessage(data.pickupDate, data.pickupTimeSlot),
+        path: ["pickupTimeSlot"],
+      });
+    }
+    const available = getAvailableTimeSlots(data.pickupDate);
+    if (available.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No pickup slots left for this date. Choose another date.",
+        path: ["pickupDate"],
+      });
     }
   });
 
