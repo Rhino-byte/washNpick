@@ -1,5 +1,6 @@
 from typing import Annotated
 import asyncio
+import logging
 
 from fastapi import Depends, Header, HTTPException, status
 from firebase_admin import auth, credentials, initialize_app
@@ -10,6 +11,8 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import StaffMember, User
 from app.services.staff import get_or_create_staff_member
+
+logger = logging.getLogger(__name__)
 
 _firebase_app = None
 
@@ -108,9 +111,10 @@ async def get_current_staff(
     )
     member = result.scalar_one_or_none()
     if not member or not member.is_active:
+        logger.info("Staff access denied for uid=%s", firebase_uid)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized for staff access",
+            detail="Access denied",
         )
     if email and member.email != email:
         member.email = email
