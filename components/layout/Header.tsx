@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Phone, LogIn } from "lucide-react";
+import { Phone } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { UserMenu } from "./UserMenu";
 import { siteConfig, formatPhoneTel } from "@/lib/site-config";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Button } from "@/components/ui/button";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 export function Header() {
   const { profile, isConfigured, signIn, loading, signInError, signInLoading } =
@@ -27,19 +27,12 @@ export function Header() {
             profile ? (
               <UserMenu />
             ) : (
-              <Button
-                variant="ghost"
+              <GoogleSignInButton
                 size="sm"
+                compact
                 loading={signInLoading}
-                loadingText="Sign in"
-                overlay={false}
                 onClick={() => void signIn()}
-                className="gap-1.5"
-                aria-label="Sign in with Google"
-              >
-                <LogIn className="h-4 w-4" />
-                Sign in
-              </Button>
+              />
             )
           )}
           <a

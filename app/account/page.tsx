@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { LogIn } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AccountProfileHeader } from "@/components/account/AccountProfileHeader";
 import { AccountProfileForm } from "@/components/account/AccountProfileForm";
 import { AccountAddresses } from "@/components/account/AccountAddresses";
@@ -41,19 +41,13 @@ export default function AccountPage() {
               Restoring your session…
             </div>
           )}
-          <Button
-            variant="accent"
+          <GoogleSignInButton
             size="lg"
             fullWidth
             className="mt-6"
             loading={signInLoading || (Boolean(firebaseUser) && syncingProfile)}
-            loadingText="Sign in with Google"
-            overlay={false}
             onClick={() => void signIn()}
-          >
-            <LogIn className="h-4 w-4" />
-            Sign in with Google
-          </Button>
+          />
           <Link
             href="/order"
             className="mt-4 block text-center text-sm text-accent-start hover:underline"

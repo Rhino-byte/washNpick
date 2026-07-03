@@ -1,8 +1,7 @@
 "use client";
 
-import { LogIn } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Button } from "@/components/ui/button";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { DottedSpinner } from "@/components/ui/DottedSpinner";
 
 export function OrderSignInGate() {
@@ -49,19 +48,13 @@ export function OrderSignInGate() {
           </div>
         )}
 
-        <Button
-          variant="accent"
+        <GoogleSignInButton
           size="lg"
           fullWidth
           className="mt-6"
           loading={signInLoading || restoringSession}
-          loadingText="Sign in with Google"
-          overlay={false}
           onClick={() => void signIn()}
-        >
-          <LogIn className="h-4 w-4" />
-          Sign in with Google
-        </Button>
+        />
       </div>
     </div>
   );

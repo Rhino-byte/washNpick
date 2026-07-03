@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { LogIn, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
 import { DottedSpinner } from "@/components/ui/DottedSpinner";
 import { api } from "@/lib/api";
@@ -49,19 +50,13 @@ export function StaffGate({ children }: StaffGateProps) {
             Sign in with your authorized Google account to manage orders.
           </p>
           {signInError && <p className="mt-4 text-sm text-red-300">{signInError}</p>}
-          <Button
-            variant="accent"
+          <GoogleSignInButton
             size="lg"
             fullWidth
             className="mt-6"
             loading={signInLoading}
-            loadingText="Sign in with Google"
-            overlay={false}
             onClick={() => void signIn()}
-          >
-            <LogIn className="h-4 w-4" />
-            Sign in with Google
-          </Button>
+          />
         </div>
       </div>
     );
