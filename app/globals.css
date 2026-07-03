@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+:root {
+  --background: #070b12;
+  --background-outer: #030508;
+  --foreground: #f1f5f9;
+  --muted: #94a3b8;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-elevated: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.1);
+  --accent-start: #22d3ee;
+  --accent-mid: #6366f1;
+  --accent-end: #c084fc;
+  --glow-cyan: rgba(34, 211, 238, 0.15);
+  --glow-violet: rgba(192, 132, 252, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-accent-start: var(--accent-start);
+  --color-accent-mid: var(--accent-mid);
+  --color-accent-end: var(--accent-end);
+  --font-sans: var(--font-dm-sans);
+}
+
+body {
+  background: var(--background-outer);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+textarea,
+button {
+  font-size: 16px;
+}
+
+/* Ambient gradient shell */
+.app-shell {
+  position: relative;
+  background: var(--background);
+  isolation: isolate;
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--glow-cyan), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 30%, var(--glow-violet), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 0% 70%, rgba(99, 102, 241, 0.1), transparent 50%),
+    linear-gradient(180deg, #0c1220 0%, var(--background) 40%, #0a0e18 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Keep page content above the fixed ambient gradient (::before). main/footer only — not nav (fixed bottom bar). */
+.app-shell > main,
+.app-shell > footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass surfaces */
+.glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-card-elevated {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-nav {
+  background: rgba(7, 11, 18, 0.75);
+  border-color: var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Gradient utilities */
+.gradient-fade-hero {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0.12) 0%,
+    rgba(99, 102, 241, 0.08) 35%,
+    transparent 70%
+  );
+}
+
+.gradient-cta {
+  background: linear-gradient(135deg, var(--accent-start) 0%, var(--accent-mid) 50%, var(--accent-end) 100%);
+  box-shadow: 0 4px 24px rgba(34, 211, 238, 0.25), 0 0 40px rgba(192, 132, 252, 0.1);
+}
+
+.gradient-cta:hover {
+  box-shadow: 0 6px 28px rgba(34, 211, 238, 0.35), 0 0 48px rgba(192, 132, 252, 0.15);
+}
+
+.gradient-cta:active {
+  opacity: 0.92;
+}
+
+.gradient-primary-btn {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.9) 0%, rgba(99, 102, 241, 0.9) 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gradient-border-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.gradient-border-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.35), rgba(192, 132, 252, 0.2), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.selected-glow {
+  border-color: rgba(34, 211, 238, 0.45);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.08), rgba(192, 132, 252, 0.06));
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.08);
+}
+
+.step-active {
+  background: linear-gradient(135deg, var(--accent-start), var(--accent-mid));
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.35);
+}
+
+.step-complete {
+  background: rgba(34, 211, 238, 0.15);
+  color: var(--accent-start);
+}
+
+@media (min-width: 481px) {
+  body {
+    background: var(--background-outer);
+  }
+}
