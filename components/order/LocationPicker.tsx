@@ -201,10 +201,12 @@ export function LocationPicker({
         size="lg"
         fullWidth
         onClick={handleUseMyLocation}
-        disabled={geoState === "loading"}
+        loading={geoState === "loading"}
+        loadingText="Getting location"
+        overlay={false}
       >
         <Navigation className="h-4 w-4" />
-        {geoState === "loading" ? "Getting location…" : "Use my current location"}
+        Use my current location
       </Button>
 
       {geoError && <p className="text-sm text-amber-400">{geoError}</p>}

@@ -8,6 +8,7 @@ import type { StoredOrder } from "@/lib/order-types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { DottedSpinner } from "@/components/ui/DottedSpinner";
 import { StatusTimeline } from "@/components/track/StatusTimeline";
 import { OrderSummary } from "@/components/order/OrderSummary";
 import { WhatsAppPlaceholder } from "@/components/WhatsAppPlaceholder";
@@ -92,9 +93,16 @@ function TrackContent() {
             }
           />
         </div>
-        <Button type="submit" variant="primary" size="lg" fullWidth disabled={loading}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={loading}
+          loadingText="Searching"
+        >
           <Search className="h-4 w-4" />
-          {loading ? "Searching…" : "Track order"}
+          Track order
         </Button>
       </form>
 
@@ -124,7 +132,7 @@ export function TrackPageContent() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent-start border-t-transparent" />
+          <DottedSpinner size="lg" />
         </div>
       }
     >

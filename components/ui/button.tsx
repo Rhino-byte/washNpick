@@ -1,3 +1,8 @@
+"use client";
+
+import { useEffect, useId } from "react";
+import { usePageLoading } from "@/components/providers/PageLoadingProvider";
+import { DottedSpinner } from "@/components/ui/DottedSpinner";
 import { cn } from "@/lib/utils";
 
 const variants = {
@@ -22,6 +27,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: keyof typeof variants;
   size?: keyof typeof sizes;
   fullWidth?: boolean;
+  loading?: boolean;
+  loadingText?: string;
+  /** When false, only the inline spinner shows — no page blur overlay. */
+  overlay?: boolean;
 }
 
 export function Button({
@@ -29,9 +38,24 @@ export function Button({
   variant = "primary",
   size = "md",
   fullWidth,
+  loading = false,
+  loadingText,
+  overlay = true,
+  disabled,
   children,
   ...props
 }: ButtonProps) {
+  const { setOverlayActive } = usePageLoading();
+  const overlayId = useId();
+
+  useEffect(() => {
+    if (!loading || !overlay) return;
+    setOverlayActive(overlayId, true);
+    return () => setOverlayActive(overlayId, false);
+  }, [loading, overlay, overlayId, setOverlayActive]);
+
+  const isDisabled = disabled || loading;
+
   return (
     <button
       className={cn(
@@ -41,9 +65,20 @@ export function Button({
         fullWidth && "w-full",
         className,
       )}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
       {...props}
     >
-      {children}
+      {loading ? (
+        <>
+          <DottedSpinner size="sm" className="shrink-0" />
+          {(loadingText !== undefined ? loadingText : children) ? (
+            <span>{loadingText !== undefined ? loadingText : children}</span>
+          ) : null}
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }

@@ -110,7 +110,16 @@ function getStepErrors(
 export function OrderWizard() {
   const searchParams = useSearchParams();
   const serviceParam = searchParams.get("service") as ServiceId | null;
-  const { profile, loading: authLoading, signIn, getToken, refreshProfile, isConfigured } =
+  const {
+    profile,
+    loading: authLoading,
+    signIn,
+    signInError,
+    signInLoading,
+    getToken,
+    refreshProfile,
+    isConfigured,
+  } =
     useAuth();
   const { services } = useServices();
 
@@ -285,7 +294,18 @@ export function OrderWizard() {
           <p className="text-sm text-muted">
             Sign in with Google to save your details and order faster next time.
           </p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => signIn()}>
+          {signInError && (
+            <p className="mt-2 text-sm text-red-300">{signInError}</p>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            loading={signInLoading}
+            loadingText="Sign in with Google"
+            overlay={false}
+            onClick={() => void signIn()}
+          >
             <LogIn className="h-4 w-4" />
             Sign in with Google
           </Button>
@@ -517,7 +537,7 @@ export function OrderWizard() {
           </div>
         )}
 
-        <div className="mt-8 flex gap-3">
+        <div className="relative z-20 mt-8 flex gap-3">
           {step > (profile?.profile_complete ? 2 : 1) && (
             <Button variant="secondary" size="lg" onClick={goBack} className="flex-1">
               <ArrowLeft className="h-4 w-4" />
@@ -535,9 +555,11 @@ export function OrderWizard() {
               size="lg"
               onClick={handleSubmit}
               className="flex-1"
-              disabled={submitting || (isBurned && data.paymentMethod === "cod")}
+              loading={submitting}
+              loadingText="Placing order"
+              disabled={isBurned && data.paymentMethod === "cod"}
             >
-              {submitting ? "Placing order…" : "Place order"}
+              Place order
             </Button>
           )}
         </div>

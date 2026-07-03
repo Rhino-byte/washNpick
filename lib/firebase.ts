@@ -34,6 +34,30 @@ export function getFirebaseAuth(): Auth | null {
   return auth;
 }
 
+export function formatFirebaseAuthError(error: unknown): string {
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : "";
+
+  switch (code) {
+    case "auth/operation-not-allowed":
+      return "Google sign-in is not enabled. In Firebase Console → Authentication → Sign-in method, turn on Google and add localhost under Authorized domains.";
+    case "auth/popup-closed-by-user":
+      return "Sign-in was cancelled.";
+    case "auth/popup-blocked":
+      return "Sign-in popup was blocked. Allow popups for this site and try again.";
+    case "auth/unauthorized-domain":
+      return "This site is not authorized for Firebase sign-in. Add it under Authentication → Settings → Authorized domains.";
+    default:
+      if (error instanceof Error && error.message) return error.message;
+      return "Sign-in failed. Please try again.";
+  }
+}
+
 export async function signInWithGoogle(): Promise<User> {
   const firebaseAuth = getFirebaseAuth();
   if (!firebaseAuth) throw new Error("Firebase is not configured");

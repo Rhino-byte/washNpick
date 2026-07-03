@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
 import { siteConfig } from "@/lib/site-config";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { PageLoadingProvider } from "@/components/providers/PageLoadingProvider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -52,7 +53,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} dark h-full`}>
       <body className="min-h-full bg-background text-foreground antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PageLoadingProvider>{children}</PageLoadingProvider>
+        </AuthProvider>
       </body>
     </html>
   );

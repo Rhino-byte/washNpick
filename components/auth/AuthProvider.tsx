@@ -12,6 +12,7 @@ import {
 import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import { api, type ApiUserProfile } from "@/lib/api";
 import {
+  formatFirebaseAuthError,
   getFirebaseAuth,
   getIdToken,
   isFirebaseConfigured,
@@ -24,10 +25,14 @@ interface AuthContextValue {
   profile: ApiUserProfile | null;
   loading: boolean;
   isConfigured: boolean;
-  signIn: () => Promise<void>;
+  signInError: string | null;
+  signInLoading: boolean;
+  signOutLoading: boolean;
+  signIn: () => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   getToken: () => Promise<string | null>;
+  clearSignInError: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -36,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<ApiUserProfile | null>(null);
   const [loading, setLoading] = useState(isFirebaseConfigured());
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signInLoading, setSignInLoading] = useState(false);
+  const [signOutLoading, setSignOutLoading] = useState(false);
 
   const syncProfile = useCallback(async (token: string) => {
     const { user } = await api.syncAuth(token);
@@ -81,13 +89,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, [syncProfile]);
 
+  const clearSignInError = useCallback(() => setSignInError(null), []);
+
   const signIn = useCallback(async () => {
-    await signInWithGoogle();
+    setSignInError(null);
+    setSignInLoading(true);
+    try {
+      await signInWithGoogle();
+      return true;
+    } catch (error) {
+      setSignInError(formatFirebaseAuthError(error));
+      return false;
+    } finally {
+      setSignInLoading(false);
+    }
   }, []);
 
   const signOut = useCallback(async () => {
-    await firebaseSignOut();
-    setProfile(null);
+    setSignOutLoading(true);
+    try {
+      await firebaseSignOut();
+      setProfile(null);
+      setSignInError(null);
+    } finally {
+      setSignOutLoading(false);
+    }
   }, []);
 
   const value = useMemo(
@@ -96,12 +122,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       isConfigured: isFirebaseConfigured(),
+      signInError,
+      signInLoading,
+      signOutLoading,
       signIn,
       signOut,
       refreshProfile,
       getToken: getIdToken,
+      clearSignInError,
     }),
-    [firebaseUser, profile, loading, signIn, signOut, refreshProfile],
+    [
+      firebaseUser,
+      profile,
+      loading,
+      signInError,
+      signInLoading,
+      signOutLoading,
+      signIn,
+      signOut,
+      refreshProfile,
+      clearSignInError,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

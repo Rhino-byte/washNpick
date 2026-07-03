@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { ImageSlot } from "@/components/ui/ImageSlot";
 import { Button } from "@/components/ui/button";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAllSiteImageSlots } from "@/lib/site-images";
@@ -140,7 +141,7 @@ export default function AdminMediaPage() {
   if (!secret) {
     return (
       <div className="app-shell mx-auto flex min-h-screen w-full max-w-[480px] flex-col px-4 py-8">
-        <main className="flex-1">
+        <main className="relative flex-1">
           <div className="glass-card rounded-2xl p-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-elevated">
               <Lock className="h-6 w-6 text-accent-start" />
@@ -170,9 +171,10 @@ export default function AdminMediaPage() {
                 variant="accent"
                 size="lg"
                 fullWidth
-                disabled={unlocking}
+                loading={unlocking}
+                loadingText="Verifying"
               >
-                {unlocking ? "Verifying..." : "Unlock"}
+                Unlock
               </Button>
             </form>
             <Link
@@ -183,6 +185,7 @@ export default function AdminMediaPage() {
               Back to site
             </Link>
           </div>
+          <LoadingOverlay />
         </main>
       </div>
     );
@@ -192,7 +195,7 @@ export default function AdminMediaPage() {
 
   return (
     <div className="app-shell mx-auto min-h-screen w-full max-w-[480px] px-4 py-6 pb-12">
-      <main>
+      <main className="relative">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">Media admin</h1>
@@ -266,11 +269,12 @@ export default function AdminMediaPage() {
                   variant="outline"
                   size="md"
                   fullWidth
-                  disabled={state.status === "uploading"}
+                  loading={state.status === "uploading"}
+                  loadingText="Uploading"
                   onClick={() => document.getElementById(inputId)?.click()}
                 >
                   <Upload className="h-4 w-4" />
-                  {state.status === "uploading" ? "Uploading..." : "Upload image"}
+                  Upload image
                 </Button>
                 {state.message && (
                   <p
@@ -305,6 +309,7 @@ export default function AdminMediaPage() {
         <ArrowLeft className="h-4 w-4" />
         Back to site
       </Link>
+      <LoadingOverlay />
       </main>
     </div>
   );
