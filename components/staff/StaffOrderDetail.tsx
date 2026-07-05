@@ -1,18 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight } from "lucide-react";
 import type { ApiOrder } from "@/lib/api";
 import { apiOrderToStored } from "@/lib/order-storage";
-import {
-  getNextOrderStatus,
-  ORDER_STATUS_LABELS,
-  type OrderStatus,
-} from "@/lib/order-types";
+import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/order-types";
 import { StatusTimeline } from "@/components/track/StatusTimeline";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { DottedSpinner } from "@/components/ui/DottedSpinner";
 
 function formatStatusLabel(status: string): string {
@@ -28,20 +19,9 @@ function formatStatusLabel(status: string): string {
 interface StaffOrderDetailProps {
   order: ApiOrder | null;
   loading: boolean;
-  onAdvance: (status: string, note?: string) => Promise<void>;
-  advancing: boolean;
-  error: string;
 }
 
-export function StaffOrderDetail({
-  order,
-  loading,
-  onAdvance,
-  advancing,
-  error,
-}: StaffOrderDetailProps) {
-  const [note, setNote] = useState("");
-
+export function StaffOrderDetail({ order, loading }: StaffOrderDetailProps) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -57,12 +37,11 @@ export function StaffOrderDetail({
   }
 
   const stored = apiOrderToStored(order);
-  const nextStatus = getNextOrderStatus(order.status);
   const pickup = order.addresses.find((a) => a.type === "pickup");
   const delivery = order.addresses.find((a) => a.type === "delivery");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-32">
       <div className="glass-card rounded-2xl p-4">
         <p className="font-mono text-lg font-bold text-foreground">{order.id}</p>
         <p className="mt-1 text-sm text-muted">
@@ -100,7 +79,10 @@ export function StaffOrderDetail({
                   new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
               )
               .map((entry) => (
-                <li key={`${entry.status}-${entry.created_at}`} className="border-b border-border pb-2 last:border-0">
+                <li
+                  key={`${entry.status}-${entry.created_at}`}
+                  className="border-b border-border pb-2 last:border-0"
+                >
                   <p className="font-medium text-foreground">{formatStatusLabel(entry.status)}</p>
                   <p className="text-xs text-muted">
                     {new Date(entry.created_at).toLocaleString("en-KE")}
@@ -110,36 +92,6 @@ export function StaffOrderDetail({
               ))}
           </ul>
         </div>
-      )}
-
-      {nextStatus && (
-        <div className="glass-card rounded-2xl p-4">
-          <Label htmlFor="status-note">Note (optional)</Label>
-          <Input
-            id="status-note"
-            className="mt-2"
-            placeholder="e.g. Picked up at gate"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-          {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-          <Button
-            variant="accent"
-            size="lg"
-            fullWidth
-            className="mt-4"
-            loading={advancing}
-            loadingText="Updating"
-            onClick={() => void onAdvance(nextStatus, note.trim() || undefined)}
-          >
-            Mark as {ORDER_STATUS_LABELS[nextStatus]}
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {!nextStatus && order.status === "delivered" && (
-        <p className="text-center text-sm text-emerald-400">Order delivered.</p>
       )}
     </div>
   );

@@ -2,9 +2,14 @@
 
 import type { ApiStaffOrderListItem } from "@/lib/api";
 import { formatDisplayDate } from "@/lib/order-storage";
-import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/order-types";
+import {
+  getNextOrderStatus,
+  ORDER_STATUS_LABELS,
+  type OrderStatus,
+} from "@/lib/order-types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 function formatStatusLabel(status: string): string {
   if (status in ORDER_STATUS_LABELS) {
@@ -24,14 +29,22 @@ function customerName(order: ApiStaffOrderListItem): string {
 interface StaffOrderListProps {
   orders: ApiStaffOrderListItem[];
   selectedId: string | null;
+  highlightId: string | null;
+  successFlashId: string | null;
+  advancingOrderId: string | null;
   onSelect: (orderId: string) => void;
+  onQuickAdvance: (orderId: string, nextStatus: string) => void;
   loading?: boolean;
 }
 
 export function StaffOrderList({
   orders,
   selectedId,
+  highlightId,
+  successFlashId,
+  advancingOrderId,
   onSelect,
+  onQuickAdvance,
   loading,
 }: StaffOrderListProps) {
   if (loading) {
@@ -44,42 +57,74 @@ export function StaffOrderList({
 
   return (
     <ul className="space-y-2">
-      {orders.map((order) => (
-        <li key={order.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(order.id)}
-            className={cn(
-              "w-full rounded-xl border p-3 text-left transition-colors",
-              selectedId === order.id
-                ? "border-accent-start bg-accent-start/10"
-                : "border-border bg-surface hover:bg-surface-elevated",
-            )}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-mono text-sm font-semibold text-foreground">{order.id}</p>
-                <p className="mt-0.5 text-sm text-foreground/90">{customerName(order)}</p>
-                {order.customer_phone && (
-                  <p className="text-xs text-muted">{order.customer_phone}</p>
-                )}
-              </div>
-              <Badge variant="accent" className="shrink-0 text-[10px]">
-                {formatStatusLabel(order.status)}
-              </Badge>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-x-3 text-xs text-muted">
-              {order.pickup_date && (
-                <span>Pickup: {formatDisplayDate(order.pickup_date)}</span>
+      {orders.map((order) => {
+        const nextStatus = getNextOrderStatus(order.status);
+        const isAdvancing = advancingOrderId === order.id;
+
+        return (
+          <li key={order.id}>
+            <div
+              className={cn(
+                "rounded-xl border transition-colors",
+                selectedId === order.id && "border-accent-start bg-accent-start/10",
+                highlightId === order.id && "ring-2 ring-accent-start ring-offset-2 ring-offset-background",
+                successFlashId === order.id && "border-emerald-400 bg-emerald-400/10",
+                selectedId !== order.id &&
+                  highlightId !== order.id &&
+                  successFlashId !== order.id &&
+                  "border-border bg-surface",
               )}
-              {order.pickup_time_slot && (
-                <span className="capitalize">{order.pickup_time_slot}</span>
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(order.id)}
+                className="w-full p-3 text-left hover:bg-surface-elevated/50"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-sm font-semibold text-foreground">{order.id}</p>
+                    <p className="mt-0.5 text-sm text-foreground/90">{customerName(order)}</p>
+                    {order.customer_phone && (
+                      <p className="text-xs text-muted">{order.customer_phone}</p>
+                    )}
+                  </div>
+                  <Badge variant="accent" className="shrink-0 text-[10px]">
+                    {formatStatusLabel(order.status)}
+                  </Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 text-xs text-muted">
+                  {order.pickup_date && (
+                    <span>Pickup: {formatDisplayDate(order.pickup_date)}</span>
+                  )}
+                  {order.pickup_time_slot && (
+                    <span className="capitalize">{order.pickup_time_slot}</span>
+                  )}
+                  <span>KES {order.estimated_total.toLocaleString()}</span>
+                </div>
+              </button>
+
+              {nextStatus && (
+                <div className="border-t border-border px-3 pb-3 pt-2">
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    fullWidth
+                    loading={isAdvancing}
+                    loadingText="Updating"
+                    overlay={false}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAdvance(order.id, nextStatus);
+                    }}
+                  >
+                    Mark as {ORDER_STATUS_LABELS[nextStatus]}
+                  </Button>
+                </div>
               )}
-              <span>KES {order.estimated_total.toLocaleString()}</span>
             </div>
-          </button>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }
