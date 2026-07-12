@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 
 from app.models.enums import (
     AddressType,
+    ConversationState,
+    EscalationStatus,
+    MessageDirection,
     OrderStatus,
     PaymentMethod,
     PaymentType,
@@ -220,3 +223,114 @@ class StaffOrderListItem(BaseModel):
 class StaffStatusUpdate(BaseModel):
     status: OrderStatus
     note: str | None = None
+
+
+class StaffMessageTestSend(BaseModel):
+    phone: str = Field(..., min_length=9)
+    body: str | None = None
+
+
+class StaffMessageReply(BaseModel):
+    body: str = Field(..., min_length=1, max_length=1600)
+
+
+class WhatsappEscalationPatch(BaseModel):
+    status: EscalationStatus
+
+
+class WhatsappMessageResponse(BaseModel):
+    id: UUID
+    direction: MessageDirection
+    body: str
+    twilio_message_sid: str | None
+    twilio_status: str | None
+    error_code: str | None
+    error_message: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class WhatsappEscalationResponse(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    reason: str
+    status: EscalationStatus
+    claimed_by_staff_id: UUID | None
+    created_at: datetime
+    claimed_at: datetime | None
+    resolved_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class WhatsappConversationSummary(BaseModel):
+    id: UUID
+    customer_phone: str
+    state: ConversationState
+    order_id: str | None
+    last_message_at: datetime | None
+    last_message_preview: str | None
+    open_escalation_id: UUID | None
+
+
+class WhatsappConversationDetail(BaseModel):
+    id: UUID
+    customer_phone: str
+    state: ConversationState
+    order_id: str | None
+    last_message_at: datetime | None
+    messages: list[WhatsappMessageResponse]
+    escalations: list[WhatsappEscalationResponse]
+
+
+class MessagingErrorBreakdown(BaseModel):
+    error_code: str
+    error_message: str | None
+    count: int
+    last_seen: str | None
+    sample_message: str | None
+
+
+class MessagingFailureItem(BaseModel):
+    id: str
+    order_id: str
+    recipient_phone: str
+    error_code: str | None
+    error_message: str | None
+    message_body: str | None
+    created_at: str | None
+
+
+class StaffMessagingAnalytics(BaseModel):
+    from_: str = Field(alias="from")
+    to: str
+    outbound: dict
+    inbound_count: int
+    escalations: dict
+    errors: list[MessagingErrorBreakdown]
+    recent_failures: list[MessagingFailureItem]
+
+    model_config = {"populate_by_name": True}
+
+
+class WhatsappBotConfigResponse(BaseModel):
+    id: UUID | None
+    system_prompt: str
+    updated_at: datetime | None
+    updated_by_name: str | None
+
+
+class WhatsappBotConfigUpdate(BaseModel):
+    system_prompt: str = Field(..., min_length=20, max_length=8000)
+
+
+class WhatsappBotPreviewRequest(BaseModel):
+    sample_message: str = Field(..., min_length=1, max_length=1600)
+    system_prompt: str | None = Field(default=None, max_length=8000)
+
+
+class WhatsappBotPreviewResponse(BaseModel):
+    action: str
+    message: str
+    reason: str | None = None

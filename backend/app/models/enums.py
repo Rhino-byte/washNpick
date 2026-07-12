@@ -58,3 +58,32 @@ class NotificationStatus(str, enum.Enum):
     queued = "queued"
     sent = "sent"
     failed = "failed"
+    delivered = "delivered"
+    undelivered = "undelivered"
+    read = "read"
+
+
+class MessageDirection(str, enum.Enum):
+    inbound = "inbound"
+    outbound = "outbound"
+
+
+class TwilioMessageStatus(str, enum.Enum):
+    queued = "queued"
+    sent = "sent"
+    delivered = "delivered"
+    read = "read"
+    failed = "failed"
+    undelivered = "undelivered"
+
+
+class ConversationState(str, enum.Enum):
+    bot = "bot"
+    escalated = "escalated"
+    closed = "closed"
+
+
+class EscalationStatus(str, enum.Enum):
+    open = "open"
+    claimed = "claimed"
+    resolved = "resolved"

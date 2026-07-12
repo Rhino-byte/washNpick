@@ -8,6 +8,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.models.enums import (
     AddressType,
+    ConversationState,
+    EscalationStatus,
+    MessageDirection,
     NotificationChannel,
     NotificationStatus,
     OrderStatus,
@@ -174,11 +177,81 @@ class NotificationLog(Base):
     channel: Mapped[NotificationChannel] = mapped_column(default=NotificationChannel.whatsapp)
     template_key: Mapped[str] = mapped_column(String(50))
     recipient_phone: Mapped[str] = mapped_column(String(20))
+    direction: Mapped[MessageDirection] = mapped_column(default=MessageDirection.outbound)
+    message_body: Mapped[str | None] = mapped_column(Text)
     twilio_message_sid: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[NotificationStatus] = mapped_column(default=NotificationStatus.queued)
+    twilio_status: Mapped[str | None] = mapped_column(String(20))
+    error_code: Mapped[str | None] = mapped_column(String(20))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     order: Mapped["Order"] = relationship(back_populates="notifications")
+
+
+class WhatsappConversation(Base):
+    __tablename__ = "whatsapp_conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    customer_phone: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    state: Mapped[ConversationState] = mapped_column(default=ConversationState.bot)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    order_id: Mapped[str | None] = mapped_column(ForeignKey("orders.id"))
+    unknown_strikes: Mapped[int] = mapped_column(Integer, default=0)
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User | None"] = relationship()
+    order: Mapped["Order | None"] = relationship()
+    messages: Mapped[list["WhatsappMessage"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+    escalations: Mapped[list["WhatsappEscalation"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+
+class WhatsappMessage(Base):
+    __tablename__ = "whatsapp_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("whatsapp_conversations.id", ondelete="CASCADE"), index=True
+    )
+    direction: Mapped[MessageDirection] = mapped_column()
+    body: Mapped[str] = mapped_column(Text)
+    twilio_message_sid: Mapped[str | None] = mapped_column(String(50), index=True)
+    twilio_status: Mapped[str | None] = mapped_column(String(20))
+    error_code: Mapped[str | None] = mapped_column(String(20))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    staff_member_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_members.id"))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    conversation: Mapped["WhatsappConversation"] = relationship(back_populates="messages")
+    staff_member: Mapped["StaffMember | None"] = relationship()
+
+
+class WhatsappEscalation(Base):
+    __tablename__ = "whatsapp_escalations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("whatsapp_conversations.id", ondelete="CASCADE"), index=True
+    )
+    reason: Mapped[str] = mapped_column(String(100))
+    status: Mapped[EscalationStatus] = mapped_column(default=EscalationStatus.open)
+    claimed_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_members.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    conversation: Mapped["WhatsappConversation"] = relationship(back_populates="escalations")
+    claimed_by: Mapped["StaffMember | None"] = relationship()
 
 
 class StaffMember(Base):
@@ -190,3 +263,18 @@ class StaffMember(Base):
     email: Mapped[str] = mapped_column(String(255), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WhatsappBotPrompt(Base):
+    __tablename__ = "whatsapp_bot_prompts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    system_prompt: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    updated_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_members.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    updated_by: Mapped["StaffMember | None"] = relationship()

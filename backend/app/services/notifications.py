@@ -2,7 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models import NotificationLog, Order, User
-from app.models.enums import NotificationStatus, OrderStatus
+from app.models.enums import MessageDirection, NotificationStatus, OrderStatus
+from app.services.twilio_client import send_whatsapp_message
 
 
 STATUS_TEMPLATES: dict[OrderStatus, str] = {
@@ -40,34 +41,34 @@ async def send_order_status_whatsapp(
         return None
 
     settings = get_settings()
+    body = _build_message(template_key, order)
     log = NotificationLog(
         order_id=order.id,
         template_key=template_key,
         recipient_phone=user.phone,
+        direction=MessageDirection.outbound,
+        message_body=body,
         status=NotificationStatus.queued,
     )
     db.add(log)
     await db.flush()
 
-    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+    if not settings.twilio_configured:
         log.status = NotificationStatus.failed
+        log.error_code = "not_configured"
+        log.error_message = "Twilio credentials are not configured"
+        await db.flush()
         return log
 
-    try:
-        from twilio.rest import Client
-
-        client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
-        body = _build_message(template_key, order)
-        to = user.phone if user.phone.startswith("whatsapp:") else f"whatsapp:{user.phone}"
-        message = client.messages.create(
-            body=body,
-            from_=settings.twilio_whatsapp_from,
-            to=to,
-        )
-        log.twilio_message_sid = message.sid
+    result = await send_whatsapp_message(user.phone, body)
+    if result.success:
+        log.twilio_message_sid = result.sid
         log.status = NotificationStatus.sent
-    except Exception:
+        log.twilio_status = result.status
+    else:
         log.status = NotificationStatus.failed
+        log.error_code = result.error_code
+        log.error_message = result.error_message
 
     await db.flush()
     return log

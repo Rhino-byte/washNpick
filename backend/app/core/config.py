@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_from: str = ""
+    public_api_base_url: str = ""
+    twilio_auth_token_validation: bool = True
+    staff_escalation_phones: str = ""
+
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    whatsapp_bot_enabled: bool = True
+    twilio_mps_limit: int = 80
+    whatsapp_bot_history_limit: int = 12
 
     google_maps_api_key: str = ""
 
@@ -78,10 +87,29 @@ class Settings(BaseSettings):
         return [u.strip() for u in self.staff_firebase_uids.split(",") if u.strip()]
 
     @property
+    def staff_escalation_phone_list(self) -> list[str]:
+        return [p.strip() for p in self.staff_escalation_phones.split(",") if p.strip()]
+
+    @property
+    def twilio_configured(self) -> bool:
+        return bool(self.twilio_account_sid and self.twilio_auth_token and self.twilio_whatsapp_from)
+
+    @property
+    def twilio_status_callback_url(self) -> str | None:
+        if not self.public_api_base_url:
+            return None
+        base = self.public_api_base_url.rstrip("/")
+        return f"{base}{self.api_prefix}/webhooks/twilio/status"
+
+    @property
     def mpesa_base_url(self) -> str:
         if self.mpesa_env == "production":
             return "https://api.safaricom.co.ke"
         return "https://sandbox.safaricom.co.ke"
+
+    @property
+    def openai_configured(self) -> bool:
+        return bool(self.openai_api_key)
 
     @property
     def firebase_configured(self) -> bool:

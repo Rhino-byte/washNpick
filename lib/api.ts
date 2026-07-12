@@ -173,6 +173,94 @@ export interface ApiStaffOrderListItem {
   customer_phone: string | null;
 }
 
+export interface ApiWhatsappMessage {
+  id: string;
+  direction: "inbound" | "outbound";
+  body: string;
+  twilio_message_sid: string | null;
+  twilio_status: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface ApiWhatsappEscalation {
+  id: string;
+  conversation_id: string;
+  reason: string;
+  status: "open" | "claimed" | "resolved";
+  claimed_by_staff_id: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface ApiWhatsappConversationSummary {
+  id: string;
+  customer_phone: string;
+  state: "bot" | "escalated" | "closed";
+  order_id: string | null;
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  open_escalation_id: string | null;
+}
+
+export interface ApiWhatsappConversationDetail {
+  id: string;
+  customer_phone: string;
+  state: "bot" | "escalated" | "closed";
+  order_id: string | null;
+  last_message_at: string | null;
+  messages: ApiWhatsappMessage[];
+  escalations: ApiWhatsappEscalation[];
+}
+
+export interface ApiStaffMessagingAnalytics {
+  from: string;
+  to: string;
+  outbound: {
+    total: number;
+    delivered: number;
+    sent: number;
+    failed: number;
+  };
+  inbound_count: number;
+  escalations: {
+    open: number;
+    resolved: number;
+    avg_claim_seconds: number | null;
+  };
+  errors: Array<{
+    error_code: string;
+    error_message: string | null;
+    count: number;
+    last_seen: string | null;
+    sample_message: string | null;
+  }>;
+  recent_failures: Array<{
+    id: string;
+    order_id: string;
+    recipient_phone: string;
+    error_code: string | null;
+    error_message: string | null;
+    message_body: string | null;
+    created_at: string | null;
+  }>;
+}
+
+export interface ApiWhatsappBotConfig {
+  id: string | null;
+  system_prompt: string;
+  updated_at: string | null;
+  updated_by_name: string | null;
+}
+
+export interface ApiWhatsappBotPreview {
+  action: "reply" | "escalate";
+  message: string;
+  reason: string | null;
+}
+
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
@@ -306,5 +394,72 @@ export const api = {
       method: "PATCH",
       token,
       body: JSON.stringify({ final_total }),
+    }),
+
+  getStaffMessagingAnalytics: (
+    token: string,
+    params?: { from?: string; to?: string },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.from) qs.set("from", params.from);
+    if (params?.to) qs.set("to", params.to);
+    const query = qs.toString();
+    return request<ApiStaffMessagingAnalytics>(
+      `/api/v1/staff/messages/analytics${query ? `?${query}` : ""}`,
+      { token },
+    );
+  },
+
+  listStaffConversations: (token: string, state?: string) => {
+    const qs = state ? `?state=${encodeURIComponent(state)}` : "";
+    return request<ApiWhatsappConversationSummary[]>(
+      `/api/v1/staff/messages/conversations${qs}`,
+      { token },
+    );
+  },
+
+  getStaffConversation: (token: string, conversationId: string) =>
+    request<ApiWhatsappConversationDetail>(
+      `/api/v1/staff/messages/conversations/${encodeURIComponent(conversationId)}`,
+      { token },
+    ),
+
+  replyStaffConversation: (token: string, conversationId: string, body: string) =>
+    request<ApiWhatsappMessage>(
+      `/api/v1/staff/messages/conversations/${encodeURIComponent(conversationId)}/reply`,
+      { method: "POST", token, body: JSON.stringify({ body }) },
+    ),
+
+  patchStaffEscalation: (token: string, escalationId: string, status: string) =>
+    request<ApiWhatsappEscalation>(
+      `/api/v1/staff/messages/escalations/${encodeURIComponent(escalationId)}`,
+      { method: "PATCH", token, body: JSON.stringify({ status }) },
+    ),
+
+  sendStaffTestMessage: (token: string, phone: string, body?: string) =>
+    request<{ ok: boolean; sid: string; status: string }>("/api/v1/staff/messages/test", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ phone, body }),
+    }),
+
+  getStaffBotConfig: (token: string) =>
+    request<ApiWhatsappBotConfig>("/api/v1/staff/messages/bot-config", { token }),
+
+  updateStaffBotConfig: (token: string, system_prompt: string) =>
+    request<ApiWhatsappBotConfig>("/api/v1/staff/messages/bot-config", {
+      method: "PUT",
+      token,
+      body: JSON.stringify({ system_prompt }),
+    }),
+
+  previewStaffBotConfig: (
+    token: string,
+    body: { sample_message: string; system_prompt?: string },
+  ) =>
+    request<ApiWhatsappBotPreview>("/api/v1/staff/messages/bot-config/preview", {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
     }),
 };

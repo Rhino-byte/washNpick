@@ -48,8 +48,11 @@ async def verify_firebase_token(authorization: str | None) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
     token = authorization.removeprefix("Bearer ").strip()
     try:
-        return await asyncio.to_thread(auth.verify_id_token, token)
+        return await asyncio.to_thread(
+            lambda: auth.verify_id_token(token, clock_skew_seconds=30)
+        )
     except Exception as exc:
+        logger.warning("Firebase token verification failed: %s: %s", type(exc).__name__, exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Firebase token",

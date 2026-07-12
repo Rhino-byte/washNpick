@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, LogOut, RefreshCw } from "lucide-react";
+import { ArrowLeft, LogOut, MessageCircle, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { api, ApiError, type ApiOrder, type ApiStaffOrderListItem } from "@/lib/api";
 import { todayInBusinessTz } from "@/lib/pickup-scheduling";
@@ -216,16 +217,13 @@ export function StaffDashboard() {
             </div>
           </div>
           {!inDetailView && (
-            <Button
-              variant="ghost"
-              size="sm"
-              loading={signOutLoading}
-              overlay={false}
-              onClick={() => void signOut()}
-              aria-label="Sign out"
+            <Link
+              href="/staff/messages"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface hover:text-foreground"
+              aria-label="WhatsApp messages"
             >
-              <LogOut className="h-4 w-4" />
-            </Button>
+              <MessageCircle className="h-4 w-4" />
+            </Link>
           )}
         </div>
       </div>
@@ -324,6 +322,18 @@ export function StaffDashboard() {
           onAdvance={(status, note) => void advanceOrder(detail.id, status, "detail", note)}
         />
       )}
+
+      <div className="border-t border-border px-4 py-6">
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          disabled={signOutLoading}
+          className="inline-flex items-center gap-2 text-sm text-muted underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
+        >
+          <LogOut className="h-4 w-4" />
+          {signOutLoading ? "Signing out…" : "Sign out"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -11,3 +11,4 @@ httpx>=0.28.0
 twilio>=9.4.0
 python-multipart>=0.0.17
 tzdata>=2024.1
+openai>=1.60.0

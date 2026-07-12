@@ -6,8 +6,8 @@ export const siteConfig = {
   phone: "+254712345678",
   phoneDisplay: "+254 712 345 678",
   email: "hello@washnpick.co.ke",
-  whatsappNumber: "", // Set when WhatsApp Business API is ready
-  whatsappEnabled: false,
+  whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "",
+  whatsappEnabled: process.env.NEXT_PUBLIC_WHATSAPP_ENABLED === "true",
   currency: "KES",
   serviceArea: "Ololulunga",
   hours: "Mon–Sat, 7:00 AM – 8:00 PM",
