@@ -1,6 +1,7 @@
 """Shared Twilio WhatsApp send helper."""
 
 import asyncio
+import json
 import time
 from typing import Any
 
@@ -66,6 +67,45 @@ def _send_sync_once(
     )
 
 
+def _send_template_sync_once(
+    to_phone: str,
+    *,
+    content_sid: str,
+    content_variables: dict[str, Any] | None = None,
+    status_callback: str | None = None,
+) -> TwilioSendResult:
+    settings = get_settings()
+    if not settings.twilio_configured:
+        return TwilioSendResult(
+            success=False,
+            error_code="not_configured",
+            error_message="Twilio credentials are not configured",
+        )
+
+    from twilio.rest import Client
+
+    client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+    kwargs: dict[str, Any] = {
+        "from_": settings.twilio_whatsapp_from,
+        "to": to_whatsapp_address(to_phone),
+        "content_sid": content_sid,
+    }
+    if content_variables:
+        kwargs["content_variables"] = json.dumps(
+            {str(k): str(v) for k, v in content_variables.items()}
+        )
+    callback = status_callback or settings.twilio_status_callback_url
+    if callback:
+        kwargs["status_callback"] = callback
+
+    message = client.messages.create(**kwargs)
+    return TwilioSendResult(
+        success=True,
+        sid=message.sid,
+        status=getattr(message, "status", None) or "queued",
+    )
+
+
 def _send_sync_with_retries(
     to_phone: str,
     body: str,
@@ -97,6 +137,43 @@ def _send_sync_with_retries(
     )
 
 
+def _send_template_sync_with_retries(
+    to_phone: str,
+    *,
+    content_sid: str,
+    content_variables: dict[str, Any] | None = None,
+    status_callback: str | None = None,
+) -> TwilioSendResult:
+    last_result: TwilioSendResult | None = None
+    for attempt in range(3):
+        try:
+            return _send_template_sync_once(
+                to_phone,
+                content_sid=content_sid,
+                content_variables=content_variables,
+                status_callback=status_callback,
+            )
+        except Exception as exc:
+            code = str(getattr(exc, "code", "") or "")
+            msg = str(exc)
+            if hasattr(exc, "msg"):
+                msg = str(exc.msg)
+            last_result = TwilioSendResult(
+                success=False,
+                error_code=code or "send_failed",
+                error_message=msg,
+            )
+            if _is_rate_limit_error(exc) and attempt < 2:
+                time.sleep(0.5 * (2**attempt))
+                continue
+            return last_result
+    return last_result or TwilioSendResult(
+        success=False,
+        error_code="send_failed",
+        error_message="Failed to send template message",
+    )
+
+
 async def send_whatsapp_message(
     to_phone: str,
     body: str,
@@ -108,5 +185,23 @@ async def send_whatsapp_message(
         _send_sync_with_retries,
         to_phone,
         body,
+        status_callback=status_callback,
+    )
+
+
+async def send_whatsapp_template(
+    to_phone: str,
+    *,
+    content_sid: str,
+    content_variables: dict[str, Any] | None = None,
+    status_callback: str | None = None,
+) -> TwilioSendResult:
+    """Send a business-initiated templated WhatsApp message (Content API)."""
+    await acquire_send_slot()
+    return await asyncio.to_thread(
+        _send_template_sync_with_retries,
+        to_phone,
+        content_sid=content_sid,
+        content_variables=content_variables,
         status_callback=status_callback,
     )

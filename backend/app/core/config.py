@@ -57,8 +57,11 @@ class Settings(BaseSettings):
     twilio_auth_token_validation: bool = True
     staff_escalation_phones: str = ""
 
+    whatsapp_llm_provider: str = "openai"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
     whatsapp_bot_enabled: bool = True
     twilio_mps_limit: int = 80
     whatsapp_bot_history_limit: int = 12
@@ -110,6 +113,15 @@ class Settings(BaseSettings):
     @property
     def openai_configured(self) -> bool:
         return bool(self.openai_api_key)
+
+    @property
+    def gemini_configured(self) -> bool:
+        return bool(self.gemini_api_key)
+
+    def llm_provider_configured(self, provider: str) -> bool:
+        if provider == "gemini":
+            return self.gemini_configured
+        return self.openai_configured
 
     @property
     def firebase_configured(self) -> bool:

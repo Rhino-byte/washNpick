@@ -54,9 +54,12 @@ PUBLIC_API_BASE_URL=https://your-subdomain.ngrok-free.app
 TWILIO_AUTH_TOKEN_VALIDATION=true
 STAFF_ESCALATION_PHONES=whatsapp:+2547xxxxxxxx
 
-# OpenAI WhatsApp bot (GPT-4o mini)
+# WhatsApp bot LLM (openai | gemini)
+WHATSAPP_LLM_PROVIDER=openai
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
 WHATSAPP_BOT_ENABLED=true
 TWILIO_MPS_LIMIT=80
 WHATSAPP_BOT_HISTORY_LIMIT=12
@@ -89,32 +92,48 @@ Verify `notification_logs` shows `sent` then `delivered` after the status callba
 
 Text the sandbox number from a joined phone:
 
-- `help` — instant rule-based menu
+- `help` / `hi` / `habari` — welcome + options (LLM, with live catalog facts)
+- `how much` / pricing questions — verified service prices from the database
 - `track WP-YYYYMMDD-XXXX` — order status (last 4 digits of phone if prompted)
-- `human` — escalates to staff inbox + `STAFF_ESCALATION_PHONES` alert
-- Any other question — GPT-4o mini reply (async, a few seconds)
+- `support` — escalates to staff inbox + `STAFF_ESCALATION_PHONES` alert (`human` still works as a legacy alias)
+- Any other question — LLM reply via OpenAI or Gemini (async, a few seconds)
 
 The webhook returns **200 immediately**; the bot processes and replies in the background. Duplicate `MessageSid` values are ignored (Twilio retry-safe).
 
-Staff reply from `/staff/messages`. Edit the GPT system prompt under **Bot prompt** on the same page.
+Staff reply from `/staff/messages`. **Resolve** an escalation to hand the conversation back to the bot (customer gets a short notice). Legacy `closed` chats also reopen to the bot on the next inbound message. Edit the bot system prompt and LLM provider under **Bot prompt** on the same page.
 
-### 6. OpenAI bot configuration
+If you already saved a custom bot prompt in the dashboard, re-save it (or paste the new default) so SUPPORT wording and Facts-first rules apply — code defaults only seed empty databases.
+
+### 6. LLM bot configuration
 
 Add to `backend/.env`:
 
 ```env
+WHATSAPP_LLM_PROVIDER=openai   # openai | gemini
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
 WHATSAPP_BOT_ENABLED=true
 TWILIO_MPS_LIMIT=80
 WHATSAPP_BOT_HISTORY_LIMIT=12
 ```
 
+To use Gemini:
+
+```env
+WHATSAPP_LLM_PROVIDER=gemini
+GEMINI_API_KEY=your-google-ai-key
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+Staff can override the env default provider in `/staff/messages` → **Bot prompt** (OpenAI / Gemini / use env default).
+
 - `TWILIO_MPS_LIMIT=80` — token-bucket rate limiter on all outbound Twilio sends
 - `WHATSAPP_BOT_HISTORY_LIMIT=12` — conversation turns sent to the model
 - Tune the prompt at `/staff/messages` → **Bot prompt** (save + preview without sending)
 
-Run migration after pulling: `alembic upgrade head` (adds `whatsapp_bot_prompts` table).
+Run migration after pulling: `alembic upgrade head` (adds `whatsapp_bot_prompts` table and `llm_provider` column).
 
 ### 7. Frontend WhatsApp CTA (optional)
 

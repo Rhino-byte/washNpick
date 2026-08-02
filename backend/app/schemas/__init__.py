@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -234,6 +235,13 @@ class StaffMessageReply(BaseModel):
     body: str = Field(..., min_length=1, max_length=1600)
 
 
+class StaffConversationInitiate(BaseModel):
+    phone: str = Field(..., min_length=9)
+    content_sid: str = Field(..., min_length=10, max_length=64)
+    content_variables: dict[str, str] | None = None
+    preview_body: str | None = Field(default=None, max_length=1600)
+
+
 class WhatsappEscalationPatch(BaseModel):
     status: EscalationStatus
 
@@ -249,6 +257,12 @@ class WhatsappMessageResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class StaffConversationInitiateResponse(BaseModel):
+    ok: bool
+    conversation_id: UUID
+    message: WhatsappMessageResponse
 
 
 class WhatsappEscalationResponse(BaseModel):
@@ -317,17 +331,22 @@ class StaffMessagingAnalytics(BaseModel):
 class WhatsappBotConfigResponse(BaseModel):
     id: UUID | None
     system_prompt: str
+    llm_provider: Literal["openai", "gemini"] | None = None
+    effective_llm_provider: str
+    env_llm_provider: str
     updated_at: datetime | None
     updated_by_name: str | None
 
 
 class WhatsappBotConfigUpdate(BaseModel):
     system_prompt: str = Field(..., min_length=20, max_length=8000)
+    llm_provider: Literal["openai", "gemini"] | None = None
 
 
 class WhatsappBotPreviewRequest(BaseModel):
     sample_message: str = Field(..., min_length=1, max_length=1600)
     system_prompt: str | None = Field(default=None, max_length=8000)
+    llm_provider: Literal["openai", "gemini"] | None = None
 
 
 class WhatsappBotPreviewResponse(BaseModel):

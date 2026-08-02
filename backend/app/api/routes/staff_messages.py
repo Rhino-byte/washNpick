@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.deps import get_current_staff
 from app.models import (
@@ -16,6 +17,8 @@ from app.models import (
 )
 from app.models.enums import ConversationState, EscalationStatus
 from app.schemas import (
+    StaffConversationInitiate,
+    StaffConversationInitiateResponse,
     StaffMessageReply,
     StaffMessageTestSend,
     StaffMessagingAnalytics,
@@ -31,19 +34,46 @@ from app.schemas import (
 )
 from app.services.twilio_client import send_whatsapp_message
 from app.services.whatsapp_analytics import get_messaging_analytics
+from app.services.whatsapp_bot import initiate_conversation_with_template
 from app.services.whatsapp_bot_prompt import (
     DEFAULT_SYSTEM_PROMPT,
     get_active_prompt,
     save_active_prompt,
 )
-from app.services.whatsapp_escalation import send_staff_reply
-from app.services.whatsapp_llm import generate_bot_decision
+from app.services.whatsapp_escalation import return_conversation_to_bot, send_staff_reply
+from app.services.whatsapp_llm import generate_bot_decision, resolve_effective_provider
 
 router = APIRouter(
     prefix="/staff/messages",
     tags=["staff-messages"],
     dependencies=[Depends(get_current_staff)],
 )
+
+
+async def _bot_config_response(
+    db: AsyncSession,
+    *,
+    prompt_id=None,
+    system_prompt: str,
+    llm_provider: str | None,
+    updated_at=None,
+    updated_by_name: str | None = None,
+) -> WhatsappBotConfigResponse:
+    settings = get_settings()
+    env_provider = settings.whatsapp_llm_provider
+    if llm_provider in ("openai", "gemini"):
+        effective = llm_provider
+    else:
+        effective = await resolve_effective_provider(db)
+    return WhatsappBotConfigResponse(
+        id=prompt_id,
+        system_prompt=system_prompt,
+        llm_provider=llm_provider if llm_provider in ("openai", "gemini") else None,
+        effective_llm_provider=effective,
+        env_llm_provider=env_provider,
+        updated_at=updated_at,
+        updated_by_name=updated_by_name,
+    )
 
 
 @router.get("/analytics", response_model=StaffMessagingAnalytics)
@@ -72,15 +102,39 @@ async def send_test_message(payload: StaffMessageTestSend) -> dict:
     return {"ok": True, "sid": result.sid, "status": result.status}
 
 
+@router.post("/initiate", response_model=StaffConversationInitiateResponse)
+async def initiate_conversation(
+    payload: StaffConversationInitiate,
+    db: AsyncSession = Depends(get_db),
+) -> StaffConversationInitiateResponse:
+    conversation, msg = await initiate_conversation_with_template(
+        db,
+        phone=payload.phone,
+        content_sid=payload.content_sid,
+        content_variables=payload.content_variables,
+        preview_body=payload.preview_body,
+    )
+    await db.commit()
+    if msg.error_code:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=msg.error_message or "Failed to send template message",
+        )
+    return StaffConversationInitiateResponse(
+        ok=True,
+        conversation_id=conversation.id,
+        message=WhatsappMessageResponse.model_validate(msg),
+    )
+
+
 @router.get("/bot-config", response_model=WhatsappBotConfigResponse)
 async def get_bot_config(db: AsyncSession = Depends(get_db)) -> WhatsappBotConfigResponse:
     active = await get_active_prompt(db)
     if not active:
-        return WhatsappBotConfigResponse(
-            id=None,
+        return await _bot_config_response(
+            db,
             system_prompt=DEFAULT_SYSTEM_PROMPT,
-            updated_at=None,
-            updated_by_name=None,
+            llm_provider=None,
         )
 
     updated_by_name = None
@@ -89,9 +143,11 @@ async def get_bot_config(db: AsyncSession = Depends(get_db)) -> WhatsappBotConfi
         if staff:
             updated_by_name = staff.display_name
 
-    return WhatsappBotConfigResponse(
-        id=active.id,
+    return await _bot_config_response(
+        db,
+        prompt_id=active.id,
         system_prompt=active.system_prompt,
+        llm_provider=active.llm_provider,
         updated_at=active.updated_at,
         updated_by_name=updated_by_name,
     )
@@ -103,11 +159,18 @@ async def update_bot_config(
     staff: StaffMember = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> WhatsappBotConfigResponse:
-    prompt = await save_active_prompt(db, payload.system_prompt, staff.id)
+    prompt = await save_active_prompt(
+        db,
+        payload.system_prompt,
+        staff.id,
+        llm_provider=payload.llm_provider,
+    )
     await db.commit()
-    return WhatsappBotConfigResponse(
-        id=prompt.id,
+    return await _bot_config_response(
+        db,
+        prompt_id=prompt.id,
         system_prompt=prompt.system_prompt,
+        llm_provider=prompt.llm_provider,
         updated_at=prompt.updated_at,
         updated_by_name=staff.display_name,
     )
@@ -130,11 +193,15 @@ async def preview_bot_config(
         conversation,
         system_prompt_override=payload.system_prompt,
         preview_message=payload.sample_message,
+        llm_provider_override=payload.llm_provider,
     )
     if not decision:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not generate preview. Check OPENAI_API_KEY and WHATSAPP_BOT_ENABLED.",
+            detail=(
+                "Could not generate preview. Check WHATSAPP_LLM_PROVIDER, "
+                "provider API key, and WHATSAPP_BOT_ENABLED."
+            ),
         )
 
     return WhatsappBotPreviewResponse(
@@ -267,7 +334,7 @@ async def update_escalation(
         escalation.resolved_at = now
         conv = await db.get(WhatsappConversation, escalation.conversation_id)
         if conv:
-            conv.state = ConversationState.closed
+            await return_conversation_to_bot(db, conv)
 
     await db.flush()
     return WhatsappEscalationResponse.model_validate(escalation)

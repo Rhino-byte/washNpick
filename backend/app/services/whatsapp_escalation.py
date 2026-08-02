@@ -54,6 +54,44 @@ async def escalate_conversation(
     return escalation
 
 
+RESOLVED_HANDBACK_REPLY = (
+    "Your issue has been marked resolved. "
+    "You can continue chatting here anytime — our assistant is ready to help."
+)
+
+
+async def return_conversation_to_bot(
+    db: AsyncSession,
+    conversation: WhatsappConversation,
+    *,
+    notify_customer: bool = True,
+) -> WhatsappMessage | None:
+    """Hand the conversation back to the bot after staff resolve an escalation."""
+    conversation.state = ConversationState.bot
+    conversation.unknown_strikes = 0
+    conversation.last_message_at = datetime.now(timezone.utc)
+
+    if not notify_customer:
+        await db.flush()
+        return None
+
+    result = await send_whatsapp_message(
+        conversation.customer_phone, RESOLVED_HANDBACK_REPLY
+    )
+    msg = WhatsappMessage(
+        conversation_id=conversation.id,
+        direction=MessageDirection.outbound,
+        body=RESOLVED_HANDBACK_REPLY,
+        twilio_message_sid=result.sid,
+        twilio_status=result.status if result.success else None,
+        error_code=result.error_code,
+        error_message=result.error_message,
+    )
+    db.add(msg)
+    await db.flush()
+    return msg
+
+
 async def send_staff_reply(
     db: AsyncSession,
     conversation: WhatsappConversation,
