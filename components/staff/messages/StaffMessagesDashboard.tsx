@@ -47,9 +47,18 @@ export function StaffMessagesDashboard() {
   const [botPromptLoading, setBotPromptLoading] = useState(true);
   const [botPromptSaving, setBotPromptSaving] = useState(false);
   const [botPromptMeta, setBotPromptMeta] = useState("");
+  const [botLlmProvider, setBotLlmProvider] = useState<"" | "openai" | "gemini">("");
+  const [envLlmProvider, setEnvLlmProvider] = useState("openai");
+  const [effectiveLlmProvider, setEffectiveLlmProvider] = useState("openai");
   const [previewMessage, setPreviewMessage] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewResult, setPreviewResult] = useState("");
+  const [initPhone, setInitPhone] = useState("");
+  const [initContentSid, setInitContentSid] = useState("");
+  const [initVariables, setInitVariables] = useState("");
+  const [initPreviewBody, setInitPreviewBody] = useState("");
+  const [initLoading, setInitLoading] = useState(false);
+  const [initResult, setInitResult] = useState("");
 
   const loadBotConfig = useCallback(async () => {
     setBotPromptLoading(true);
@@ -58,6 +67,9 @@ export function StaffMessagesDashboard() {
       if (!token) return;
       const config = await api.getStaffBotConfig(token);
       setBotPrompt(config.system_prompt);
+      setBotLlmProvider(config.llm_provider ?? "");
+      setEnvLlmProvider(config.env_llm_provider);
+      setEffectiveLlmProvider(config.effective_llm_provider);
       if (config.updated_at) {
         const when = new Date(config.updated_at).toLocaleString();
         setBotPromptMeta(
@@ -195,6 +207,40 @@ export function StaffMessagesDashboard() {
     }
   };
 
+  const handleInitiate = async () => {
+    if (!initPhone.trim() || !initContentSid.trim()) return;
+    setInitLoading(true);
+    setInitResult("");
+    setError("");
+    let variables: Record<string, string> | undefined;
+    if (initVariables.trim()) {
+      try {
+        variables = JSON.parse(initVariables.trim());
+      } catch {
+        setError('Variables must be valid JSON, e.g. {"1":"John","2":"3pm"}');
+        setInitLoading(false);
+        return;
+      }
+    }
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await api.initiateStaffConversation(token, {
+        phone: initPhone.trim(),
+        content_sid: initContentSid.trim(),
+        content_variables: variables,
+        preview_body: initPreviewBody.trim() || undefined,
+      });
+      setInitResult(`Sent (${res.message.twilio_status ?? "queued"}) — SID ${res.message.twilio_message_sid ?? "—"}`);
+      await loadConversations();
+      await loadAnalytics();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to initiate conversation");
+    } finally {
+      setInitLoading(false);
+    }
+  };
+
   const handleSaveBotPrompt = async () => {
     if (!botPrompt.trim()) return;
     setBotPromptSaving(true);
@@ -202,7 +248,13 @@ export function StaffMessagesDashboard() {
     try {
       const token = await getToken();
       if (!token) return;
-      const config = await api.updateStaffBotConfig(token, botPrompt.trim());
+      const config = await api.updateStaffBotConfig(token, {
+        system_prompt: botPrompt.trim(),
+        llm_provider: botLlmProvider || null,
+      });
+      setEnvLlmProvider(config.env_llm_provider);
+      setEffectiveLlmProvider(config.effective_llm_provider);
+      setBotLlmProvider(config.llm_provider ?? "");
       if (config.updated_at) {
         const when = new Date(config.updated_at).toLocaleString();
         setBotPromptMeta(
@@ -229,6 +281,7 @@ export function StaffMessagesDashboard() {
       const result = await api.previewStaffBotConfig(token, {
         sample_message: previewMessage.trim(),
         system_prompt: botPrompt.trim() || undefined,
+        llm_provider: botLlmProvider || null,
       });
       setPreviewResult(
         result.action === "escalate"
@@ -296,12 +349,34 @@ export function StaffMessagesDashboard() {
             </div>
           ) : (
             <>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted" htmlFor="bot-llm-provider">
+                  LLM provider
+                </label>
+                <select
+                  id="bot-llm-provider"
+                  value={botLlmProvider}
+                  onChange={(e) =>
+                    setBotLlmProvider(e.target.value as "" | "openai" | "gemini")
+                  }
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="">Use env default ({envLlmProvider})</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+                <p className="text-xs text-muted">
+                  Active provider: {botLlmProvider || envLlmProvider}
+                  {effectiveLlmProvider !== (botLlmProvider || envLlmProvider) &&
+                    ` (saved: ${effectiveLlmProvider})`}
+                </p>
+              </div>
               <textarea
                 value={botPrompt}
                 onChange={(e) => setBotPrompt(e.target.value)}
                 rows={8}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-                placeholder="System prompt for GPT-4o mini…"
+                placeholder="System prompt for the WhatsApp bot…"
               />
               {botPromptMeta && <p className="text-xs text-muted">{botPromptMeta}</p>}
               <div className="space-y-2 border-t border-border pt-3">
@@ -394,6 +469,45 @@ export function StaffMessagesDashboard() {
             </Button>
           </div>
           {testResult && <p className="text-xs text-green-400">{testResult}</p>}
+        </section>
+
+        <section className="glass-card space-y-3 rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-foreground">Start conversation (template)</h2>
+          <p className="text-xs text-muted">
+            Business-initiate with an approved template. Find the Content SID (HX…) in Twilio
+            Console → Content Template Builder. The bot takes over once the customer replies.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input
+              placeholder="Phone (254712345678)"
+              value={initPhone}
+              onChange={(e) => setInitPhone(e.target.value)}
+            />
+            <Input
+              placeholder="Content SID (HXxxxxxxxx)"
+              value={initContentSid}
+              onChange={(e) => setInitContentSid(e.target.value)}
+            />
+          </div>
+          <Input
+            placeholder='Variables JSON (optional) e.g. {"1":"John","2":"3pm"}'
+            value={initVariables}
+            onChange={(e) => setInitVariables(e.target.value)}
+          />
+          <Input
+            placeholder="Preview text for the inbox (optional)"
+            value={initPreviewBody}
+            onChange={(e) => setInitPreviewBody(e.target.value)}
+          />
+          <Button
+            size="sm"
+            loading={initLoading}
+            overlay={false}
+            onClick={() => void handleInitiate()}
+          >
+            Send template
+          </Button>
+          {initResult && <p className="text-xs text-green-400">{initResult}</p>}
         </section>
 
         {analytics && analytics.errors.length > 0 && (
@@ -517,24 +631,33 @@ export function StaffMessagesDashboard() {
                   {detail.order_id && (
                     <p className="text-xs text-muted">Order {detail.order_id}</p>
                   )}
-                  {detail.escalations[0]?.status === "open" && detail.escalations[0] && (
-                    <div className="mt-2 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        overlay={false}
-                        onClick={() => void handleClaim(detail.escalations[0].id)}
-                      >
-                        Claim
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        overlay={false}
-                        onClick={() => void handleResolve(detail.escalations[0].id)}
-                      >
-                        Resolve
-                      </Button>
+                  {(detail.escalations[0]?.status === "open" ||
+                    detail.escalations[0]?.status === "claimed") &&
+                    detail.escalations[0] && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex gap-2">
+                        {detail.escalations[0].status === "open" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            overlay={false}
+                            onClick={() => void handleClaim(detail.escalations[0].id)}
+                          >
+                            Claim
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          overlay={false}
+                          onClick={() => void handleResolve(detail.escalations[0].id)}
+                        >
+                          Resolve
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted">
+                        Resolve returns this chat to the bot for future customer messages.
+                      </p>
                     </div>
                   )}
                 </div>

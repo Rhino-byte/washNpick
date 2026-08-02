@@ -251,6 +251,9 @@ export interface ApiStaffMessagingAnalytics {
 export interface ApiWhatsappBotConfig {
   id: string | null;
   system_prompt: string;
+  llm_provider: "openai" | "gemini" | null;
+  effective_llm_provider: string;
+  env_llm_provider: string;
   updated_at: string | null;
   updated_by_name: string | null;
 }
@@ -443,19 +446,44 @@ export const api = {
       body: JSON.stringify({ phone, body }),
     }),
 
+  initiateStaffConversation: (
+    token: string,
+    payload: {
+      phone: string;
+      content_sid: string;
+      content_variables?: Record<string, string>;
+      preview_body?: string;
+    },
+  ) =>
+    request<{ ok: boolean; conversation_id: string; message: ApiWhatsappMessage }>(
+      "/api/v1/staff/messages/initiate",
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      },
+    ),
+
   getStaffBotConfig: (token: string) =>
     request<ApiWhatsappBotConfig>("/api/v1/staff/messages/bot-config", { token }),
 
-  updateStaffBotConfig: (token: string, system_prompt: string) =>
+  updateStaffBotConfig: (
+    token: string,
+    body: { system_prompt: string; llm_provider?: "openai" | "gemini" | null },
+  ) =>
     request<ApiWhatsappBotConfig>("/api/v1/staff/messages/bot-config", {
       method: "PUT",
       token,
-      body: JSON.stringify({ system_prompt }),
+      body: JSON.stringify(body),
     }),
 
   previewStaffBotConfig: (
     token: string,
-    body: { sample_message: string; system_prompt?: string },
+    body: {
+      sample_message: string;
+      system_prompt?: string;
+      llm_provider?: "openai" | "gemini" | null;
+    },
   ) =>
     request<ApiWhatsappBotPreview>("/api/v1/staff/messages/bot-config/preview", {
       method: "POST",
