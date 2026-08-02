@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface WhatsAppPlaceholderProps {
   orderRef?: string;
-  variant?: "button" | "inline";
+  variant?: "button" | "inline" | "icon";
   className?: string;
 }
 
@@ -23,6 +23,23 @@ export function WhatsAppPlaceholder({
       ? encodeURIComponent(`Hi, I'd like updates on order ${orderRef}`)
       : encodeURIComponent("Hi, I'd like to schedule a laundry pickup.");
     const href = `https://wa.me/${siteConfig.whatsappNumber}?text=${text}`;
+
+    if (variant === "icon") {
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-green-400 transition-colors hover:bg-surface-elevated active:bg-white/10",
+            className,
+          )}
+          aria-label="Chat on WhatsApp"
+        >
+          <MessageCircle className="h-5 w-5" strokeWidth={2.25} />
+        </a>
+      );
+    }
 
     return (
       <a
@@ -40,6 +57,10 @@ export function WhatsAppPlaceholder({
         {orderRef ? "Get updates on WhatsApp" : "Chat on WhatsApp"}
       </a>
     );
+  }
+
+  if (variant === "icon") {
+    return null;
   }
 
   if (variant === "inline") {

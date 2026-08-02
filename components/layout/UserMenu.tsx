@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getDisplayFirstName } from "@/lib/auth-profile";
-import { Button } from "@/components/ui/button";
+import { WhatsAppPlaceholder } from "@/components/WhatsAppPlaceholder";
 
 export function UserMenu() {
-  const { profile, firebaseUser, signOut, signOutLoading } = useAuth();
+  const { profile, firebaseUser } = useAuth();
 
   if (!profile) return null;
 
@@ -24,18 +23,7 @@ export function UserMenu() {
           {firstName || "Account"}
         </span>
       </Link>
-      <Button
-        variant="ghost"
-        size="md"
-        loading={signOutLoading}
-        loadingText=""
-        overlay={false}
-        onClick={() => void signOut()}
-        className="h-11 w-11 shrink-0 rounded-full border border-border p-0 text-foreground hover:bg-surface-elevated"
-        aria-label="Sign out"
-      >
-        <LogOut className="h-6 w-6" strokeWidth={2.25} />
-      </Button>
+      <WhatsAppPlaceholder variant="icon" />
     </div>
   );
 }

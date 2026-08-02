@@ -22,10 +22,12 @@ export function Footer() {
           </a>
           <p className="text-muted">{siteConfig.hours}</p>
         </div>
-        <WhatsAppPlaceholder variant="inline" />
-        <a href="/about" className="text-sm text-accent-start hover:underline">
-          About us
-        </a>
+        <div className="flex flex-col gap-2">
+          <WhatsAppPlaceholder variant="inline" />
+          <a href="/about" className="text-sm text-accent-start hover:underline">
+            About us
+          </a>
+        </div>
         <p className="text-xs text-muted/70">
           &copy; {new Date().getFullYear()} {siteConfig.businessName}. All rights reserved.
         </p>
