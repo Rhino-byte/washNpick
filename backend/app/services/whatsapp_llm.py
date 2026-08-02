@@ -41,6 +41,17 @@ RESPONSE_JSON_SCHEMA = {
     "additionalProperties": False,
 }
 
+# Gemini rejects additionalProperties / additional_properties in response_schema.
+GEMINI_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string", "enum": ["reply", "escalate"]},
+        "message": {"type": "string"},
+        "reason": {"type": "string"},
+    },
+    "required": ["action", "message", "reason"],
+}
+
 OPENAI_RESPONSE_SCHEMA = {
     "type": "json_schema",
     "json_schema": {
@@ -247,7 +258,7 @@ async def _call_gemini(
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 response_mime_type="application/json",
-                response_schema=RESPONSE_JSON_SCHEMA,
+                response_schema=GEMINI_RESPONSE_SCHEMA,
                 temperature=0.4 if not preview_only else 0.6,
                 max_output_tokens=400,
             ),
